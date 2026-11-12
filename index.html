@@ -131,7 +131,17 @@ function allCatalog(){return [...new Set([...BASE_CATALOG,...customCatalog,...me
 function renderCatalog(){
  const q=$('search').value.trim().toLocaleLowerCase('nl');
  const items=allCatalog().filter(n=>n.toLocaleLowerCase('nl').includes(q));
- $('catalogList').innerHTML=items.length?items.map(n=>'<button class="catalog-row" onclick="addMedicine(\''+esc(n).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')">'+esc(n)+'</button>').join(''):'<div class="catalog-row">Geen medicijn gevonden.</div>';
+ const list=$('catalogList');
+ list.innerHTML='';
+ if(!items.length){list.textContent='Geen medicijn gevonden.';return;}
+ items.forEach(name=>{
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='catalog-row';
+  button.textContent=name;
+  button.addEventListener('click',()=>addMedicine(name));
+  list.appendChild(button);
+ });
 }
 function addMedicine(name){
  if(medicines.some(m=>m.naam.toLocaleLowerCase('nl')===name.toLocaleLowerCase('nl'))){setStatus('Staat al in je lijst.');return;}
