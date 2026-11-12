@@ -58,19 +58,20 @@ function getAppData() {
     }));
 
   const catalogLast = catalogSheet.getLastRow();
-  const customCatalog = catalogLast > 1
-    ? catalogSheet.getRange(2, 1, catalogLast - 1, 1).getValues()
-        .flat().map(v => String(v || '').trim()).filter(Boolean)
+  const catalogRows = catalogLast > 1
+    ? catalogSheet.getRange(2, 1, catalogLast - 1, 2).getValues()
     : [];
+  const customCatalog = catalogRows.map(r => String(r[0] || '').trim()).filter(Boolean);
+  const removedCatalog = catalogRows.map(r => String(r[1] || '').trim()).filter(Boolean);
 
-  return { medicines: medicines, customCatalog: customCatalog };
+  return { medicines: medicines, customCatalog: customCatalog, removedCatalog: removedCatalog };
 }
 
 function saveAppData(data) {
   if (!data || !Array.isArray(data.medicines) || !Array.isArray(data.customCatalog)) {
     throw new Error('Ongeldige gegevens ontvangen.');
   }
-  if (data.medicines.length > 300 || data.customCatalog.length > 300) {
+  if (data.medicines.length > 300 || data.customCatalog.length > 300 || (data.removedCatalog || []).length > 300) {
     throw new Error('De lijst bevat te veel items.');
   }
 
@@ -107,9 +108,9 @@ function saveAppData(data) {
       medsSheet.getRange(2, 1, rows.length, 7).setValues(rows);
     }
 
-    catalogSheet.getRange(1, 1).setValue('Eigen medicatiecatalogus');
+    catalogSheet.getRange(1, 1, 1, 2).setValues([['Eigen medicatiecatalogus', 'Verwijderde standaardmedicatie']]);
     if (catalogSheet.getLastRow() > 1) {
-      catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, 1).clearContent();
+      catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, 2).clearContent();
     }
 
     const custom = [...new Set(data.customCatalog
@@ -117,8 +118,17 @@ function saveAppData(data) {
       .filter(Boolean)
       .map(v => v.slice(0, 160)))];
 
-    if (custom.length) {
-      catalogSheet.getRange(2, 1, custom.length, 1).setValues(custom.map(v => [v]));
+    const removed = [...new Set((data.removedCatalog || [])
+      .map(v => String(v || '').trim())
+      .filter(Boolean)
+      .map(v => v.slice(0, 160)))];
+
+    const rowCount = Math.max(custom.length, removed.length);
+    if (rowCount) {
+      const catalogRows = Array.from({ length: rowCount }, (_, i) => [
+        custom[i] || '', removed[i] || ''
+      ]);
+      catalogSheet.getRange(2, 1, rowCount, 2).setValues(catalogRows);
     }
 
     return { ok: true, savedAt: new Date().toISOString() };
