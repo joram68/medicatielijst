@@ -28,6 +28,11 @@ input,select{font:inherit}
 .catalog-row{display:block;width:100%;border-radius:0;background:#fff;color:#333;text-align:left;padding:8px 10px;border-bottom:1px solid #eee}
 .catalog-row:last-child{border-bottom:0}
 .catalog-row:hover{background:#f1f1f1;color:#222}
+.catalog-entry{display:flex;align-items:stretch;border-bottom:1px solid #eee}
+.catalog-entry:last-child{border-bottom:0}
+.catalog-entry .catalog-row{flex:1;min-width:0;border:0}
+.catalog-delete{width:34px;flex:none;border-radius:0;background:#fff;color:#888;padding:5px;font-size:14px}
+.catalog-delete:hover{background:#fff0f0;color:#b3261e}
 .new-row{display:flex;gap:7px;margin-top:8px}
 .new-row .new-name{min-width:0;flex:1}
 .med{padding:9px 0;border-bottom:1px solid #ececec}
@@ -118,7 +123,7 @@ const BASE_CATALOG = [
  'Elocom 0,1%','Magnetop 450 mg','EG 200 mg','Questran 4 g',
  'Protectis Adult','Omeprazole Mylan 20 mg'
 ];
-let medicines=[], customCatalog=[], dirty=false, ready=false, saveTimer=null;
+let medicines=[], customCatalog=[], removedCatalog=[], dirty=false, ready=false, saveTimer=null;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setStatus(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error);}
@@ -127,7 +132,7 @@ function toggleCatalog(){
  $('catalogToggle').textContent=(open?'－ Medicatiecatalogus sluiten':'＋ Medicatiecatalogus openen');
  if(open){$('search').focus();renderCatalog();}
 }
-function allCatalog(){return [...new Set([...BASE_CATALOG,...customCatalog,...medicines.map(m=>m.naam)].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'nl'));}
+function allCatalog(){return [...new Set([...BASE_CATALOG.filter(n=>!removedCatalog.includes(n)),...customCatalog].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'nl'));}
 function renderCatalog(){
  const q=$('search').value.trim().toLocaleLowerCase('nl');
  const items=allCatalog().filter(n=>n.toLocaleLowerCase('nl').includes(q));
@@ -135,13 +140,29 @@ function renderCatalog(){
  list.innerHTML='';
  if(!items.length){list.textContent='Geen medicijn gevonden.';return;}
  items.forEach(name=>{
+  const entry=document.createElement('div');
+  entry.className='catalog-entry';
   const button=document.createElement('button');
   button.type='button';
   button.className='catalog-row';
   button.textContent=name;
   button.addEventListener('click',()=>addMedicine(name));
-  list.appendChild(button);
+  const del=document.createElement('button');
+  del.type='button';
+  del.className='catalog-delete';
+  del.textContent='🗑';
+  del.title='Verwijder uit catalogus';
+  del.setAttribute('aria-label','Verwijder '+name+' uit catalogus');
+  del.addEventListener('click',()=>removeFromCatalog(name));
+  entry.append(button,del);
+  list.appendChild(entry);
  });
+}
+function removeFromCatalog(name){
+ if(!confirm('Wil je '+name+' uit de medicatiecatalogus verwijderen?'))return;
+ customCatalog=customCatalog.filter(n=>n!==name);
+ if(BASE_CATALOG.includes(name)&&!removedCatalog.includes(name))removedCatalog.push(name);
+ changed();renderCatalog();
 }
 function addMedicine(name){
  if(medicines.some(m=>m.naam.toLocaleLowerCase('nl')===name.toLocaleLowerCase('nl'))){setStatus('Staat al in je lijst.');return;}
@@ -198,7 +219,7 @@ function printTicket(){
  if(!medicines.some(m=>m.geselecteerd)){alert('Vink eerst de medicijnen aan die je wilt afdrukken.');return;}
  buildTicket();window.print();
 }
-function payload(){return {medicines:medicines,customCatalog:customCatalog};}
+function payload(){return {medicines:medicines,customCatalog:customCatalog,removedCatalog:removedCatalog};}
 function saveNow(){
  if(!ready){setStatus('Nog aan het verbinden…');return;}
  clearTimeout(saveTimer);
@@ -214,6 +235,7 @@ function loadData(){
  google.script.run.withSuccessHandler(data=>{
   medicines=Array.isArray(data.medicines)?data.medicines:[];
   customCatalog=Array.isArray(data.customCatalog)?data.customCatalog:[];
+  removedCatalog=Array.isArray(data.removedCatalog)?data.removedCatalog:[];
   ready=true;dirty=false;renderAll();setStatus('Verbonden – gegevens geladen');
  }).withFailureHandler(err=>{
   ready=false;setStatus('Fout: '+(err&&err.message?err.message:'geen verbinding'),true);
