@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f4f5">
+<title>HS4S - Mijn medicatie</title>
+<style>
+:root{--bg:#f3f4f5;--line:#dedede;--grey:#939393;--dark:#636363;--green:#287b45;--orange:#bd7900;--red:#bd3838}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:var(--bg);font:14px Arial,sans-serif;color:#333}
+.wrap{max-width:1050px;margin:auto}
+h1{font-size:21px;margin:0 0 10px;font-weight:650}
+h2{font-size:15px;margin:0 0 9px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:7px;padding:12px;margin:0 0 10px}
+.actions{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+button{border:0;border-radius:5px;background:var(--grey);color:#fff;padding:9px 12px;font-size:13px;cursor:pointer}
+button:hover{background:var(--dark)}
+button:disabled{opacity:.55;cursor:wait}
+.secondary{background:#e9e9e9;color:#444}
+.secondary:hover{background:#ddd;color:#222}
+.catalog-toggle{width:100%;text-align:left}
+.catalog-body{display:none;margin-top:9px}
+.catalog-body.open{display:block}
+input,select{font:inherit}
+.search,.new-name{width:100%;border:1px solid var(--line);border-radius:5px;padding:9px;background:#fff}
+.catalog-list{max-height:175px;overflow:auto;border:1px solid #e5e5e5;border-radius:5px;margin-top:7px}
+.catalog-row{display:block;width:100%;border-radius:0;background:#fff;color:#333;text-align:left;padding:8px 10px;border-bottom:1px solid #eee}
+.catalog-row:last-child{border-bottom:0}
+.catalog-row:hover{background:#f1f1f1;color:#222}
+.new-row{display:flex;gap:7px;margin-top:8px}
+.new-row .new-name{min-width:0;flex:1}
+.med{padding:9px 0;border-bottom:1px solid #ececec}
+.med:last-child{border-bottom:0}
+.med-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.med-head input{width:18px;height:18px;flex:none;accent-color:#555}
+.med-name{font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}
+.remove{padding:5px 8px;background:#e9e9e9;color:#555;font-size:12px}
+.fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.field label{display:block;color:#777;font-size:11px;margin-bottom:3px}
+.field input,.field select{width:100%;min-width:0;padding:7px 5px;border:1px solid var(--line);border-radius:4px;background:white;font-size:12px}
+.stock-many{color:var(--green)}.stock-some{color:var(--orange)}.stock-none{color:var(--red)}
+.empty{color:#888;font-style:italic;font-size:13px}
+.summary-row{padding:7px 0;border-bottom:1px solid #eee}
+.summary-row:last-child{border-bottom:0}
+.summary-name{font-weight:600}.summary-detail{font-size:12px;color:#555;margin-top:3px}
+.status{font-size:12px;color:#777;margin-left:auto}
+.status.error{color:#b3261e}
+.note{font-size:11px;color:#777;line-height:1.45;margin-top:8px}
+#ticket{display:none}
+@media(max-width:680px){body{padding:9px}.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.actions button{flex:1}.med-name{font-size:13px}}
+@media print{
+ @page{size:80mm auto;margin:4mm}
+ html,body{width:80mm!important;margin:0!important;padding:0!important;background:#fff!important}
+ body>*{display:none!important}
+ #ticket{display:block!important;width:72mm!important;margin:0 auto!important;color:#111;font-family:Arial,sans-serif}
+ #ticket h1{font-size:16px;text-align:center;margin:0 0 3px}
+ #ticket .ticket-sub{text-align:center;font-size:10px;margin-bottom:10px}
+ #ticket .ticket-date{font-size:10px;margin-bottom:8px}
+ #ticket .ticket-item{padding:7px 0;border-top:1px dashed #777;break-inside:avoid}
+ #ticket .ticket-name{font-size:12px;font-weight:bold}
+ #ticket .ticket-detail{font-size:10px;line-height:1.4;margin-top:2px}
+ #ticket .ticket-foot{text-align:center;font-size:9px;border-top:1px dashed #777;padding-top:7px;margin-top:8px}
+}
+@media print and (min-width:100mm){
+ @page{size:A4;margin:15mm}
+ html,body{width:auto!important}
+ #ticket{width:100%!important;max-width:700px}
+ #ticket h1{text-align:left;font-size:21px}
+ #ticket .ticket-sub{text-align:left;font-size:12px}
+ #ticket .ticket-name{font-size:14px}
+ #ticket .ticket-detail{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+ <h1>HS4S – Mijn medicatie</h1>
+ <div class="actions">
+  <button id="printBtn" onclick="printTicket()">Afdrukken / PDF</button>
+  <button class="secondary" id="saveBtn" onclick="saveNow()">Nu bewaren</button>
+  <span class="status" id="status">Verbinden…</span>
+ </div>
+
+ <section class="panel">
+  <button class="catalog-toggle" id="catalogToggle" onclick="toggleCatalog()">＋ Medicatiecatalogus openen</button>
+  <div class="catalog-body" id="catalogBody">
+   <input class="search" id="search" type="search" placeholder="Zoek een medicijn…" oninput="renderCatalog()">
+   <div class="catalog-list" id="catalogList"></div>
+   <div class="new-row">
+    <input class="new-name" id="newName" type="text" placeholder="Eigen medicijn toevoegen">
+    <button onclick="addCustom()">＋</button>
+   </div>
+  </div>
+ </section>
+
+ <section class="panel">
+  <h2>Mijn huidige medicatie</h2>
+  <div id="medicines"><div class="empty">De medicatielijst wordt opgehaald…</div></div>
+ </section>
+
+ <section class="panel">
+  <h2>Geselecteerd voor afdruk</h2>
+  <div id="selected"><div class="empty">Vink de medicijnen aan die je wilt afdrukken.</div></div>
+  <div class="note">Alleen de aangevinkte medicijnen komen op het ticket. Controleer doseringen altijd met je voorschrift of apotheker.</div>
+ </section>
+</div>
+<div id="ticket"></div>
+
+<script>
+const BASE_CATALOG = [
+ 'Nobiten 5 mg','Forzaten 40/10 mg','Coveram 10/5 mg',
+ 'Cetirizine EG 10 mg','Aerius 5 mg','Lipanthyl Nano 145 mg',
+ 'Lantus SoloStar','NovoRapid FlexPen','NovoFine Plus 32G 4 mm',
+ 'Diamicron 60 mg','Metformax 850 mg','Forxiga 10 mg',
+ 'Inuvair','Acamys 27,5 microgram','Xamiol 0,5 mg',
+ 'Neotigason 10 mg','Neotigason 25 mg','Clobetasol propionaat 0,05%',
+ 'Elocom 0,1%','Magnetop 450 mg','EG 200 mg','Questran 4 g',
+ 'Protectis Adult','Omeprazole Mylan 20 mg'
+];
+let medicines=[], customCatalog=[], dirty=false, ready=false, saveTimer=null;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function setStatus(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error);}
+function toggleCatalog(){
+ const open=$('catalogBody').classList.toggle('open');
+ $('catalogToggle').textContent=(open?'－ Medicatiecatalogus sluiten':'＋ Medicatiecatalogus openen');
+ if(open){$('search').focus();renderCatalog();}
+}
+function allCatalog(){return [...new Set([...BASE_CATALOG,...customCatalog,...medicines.map(m=>m.naam)].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'nl'));}
+function renderCatalog(){
+ const q=$('search').value.trim().toLocaleLowerCase('nl');
+ const items=allCatalog().filter(n=>n.toLocaleLowerCase('nl').includes(q));
+ $('catalogList').innerHTML=items.length?items.map(n=>'<button class="catalog-row" onclick="addMedicine(\''+esc(n).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')">'+esc(n)+'</button>').join(''):'<div class="catalog-row">Geen medicijn gevonden.</div>';
+}
+function addMedicine(name){
+ if(medicines.some(m=>m.naam.toLocaleLowerCase('nl')===name.toLocaleLowerCase('nl'))){setStatus('Staat al in je lijst.');return;}
+ medicines.push({naam:name,hoeveelheid:'',eenheid:'tabletten',frequentie:'per dag',moment:'',voorraad:'Veel',geselecteerd:false});
+ changed();renderAll();
+}
+function addCustom(){
+ const name=$('newName').value.trim();if(!name)return;
+ if(!customCatalog.some(n=>n.toLocaleLowerCase('nl')===name.toLocaleLowerCase('nl')))customCatalog.push(name);
+ addMedicine(name);$('newName').value='';renderCatalog();
+}
+function removeMedicine(i){medicines.splice(i,1);changed();renderAll();}
+function change(i,key,value){medicines[i][key]=value;changed();renderSelected();}
+function changed(){dirty=true;setStatus('Wijzigingen nog niet bewaard');clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,700);}
+function options(items,current){return items.map(v=>'<option value="'+esc(v)+'" '+(v===current?'selected':'')+'>'+(v||'— Kies —')+'</option>').join('');}
+function stockClass(v){return v==='Veel'?'stock-many':v==='Middelmatig'?'stock-some':'stock-none';}
+function renderAll(){renderCatalog();renderMedicines();renderSelected();}
+function renderMedicines(){
+ const root=$('medicines');
+ if(!medicines.length){root.innerHTML='<div class="empty">Open de medicatiecatalogus om medicijnen toe te voegen.</div>';return;}
+ root.innerHTML=medicines.map((m,i)=>`
+ <div class="med">
+  <div class="med-head">
+   <input type="checkbox" aria-label="Selecteer voor afdruk" ${m.geselecteerd?'checked':''} onchange="change(${i},'geselecteerd',this.checked)">
+   <span class="med-name">${esc(m.naam)}</span>
+   <button class="remove" onclick="removeMedicine(${i})">Verwijder</button>
+  </div>
+  <div class="fields">
+   <div class="field"><label>Hoeveelheid</label><input value="${esc(m.hoeveelheid)}" placeholder="Bijv. 1" onchange="change(${i},'hoeveelheid',this.value)"></div>
+   <div class="field"><label>Eenheid</label><select onchange="change(${i},'eenheid',this.value)">${options(['tabletten','capsules','eenheden','pufjes','ml','zakjes','druppels','andere'],m.eenheid)}</select></div>
+   <div class="field"><label>Frequentie</label><select onchange="change(${i},'frequentie',this.value)">${options(['per dag','per week'],m.frequentie)}</select></div>
+   <div class="field"><label>Innamemoment</label><select onchange="change(${i},'moment',this.value)">${options(['',"'s morgens","'s middags","'s avonds",'Voor het slapen','Meerdere momenten'],m.moment)}</select></div>
+   <div class="field"><label>Voorraad</label><select class="${stockClass(m.voorraad)}" onchange="change(${i},'voorraad',this.value)">${options(['Veel','Middelmatig','Leeg'],m.voorraad)}</select></div>
+  </div>
+ </div>`).join('');
+}
+function detail(m){
+ const qty=m.hoeveelheid?m.hoeveelheid+' '+m.eenheid:'Hoeveelheid niet ingevuld';
+ return [qty,m.frequentie,m.moment].filter(Boolean).join(' · ');
+}
+function renderSelected(){
+ const chosen=medicines.filter(m=>m.geselecteerd);
+ $('selected').innerHTML=chosen.length?chosen.map(m=>'<div class="summary-row"><div class="summary-name">'+esc(m.naam)+'</div><div class="summary-detail">'+esc(detail(m))+'</div></div>').join(''):'<div class="empty">Vink de medicijnen aan die je wilt afdrukken.</div>';
+ buildTicket();
+}
+function buildTicket(){
+ const chosen=medicines.filter(m=>m.geselecteerd);
+ const date=new Intl.DateTimeFormat('nl-BE',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
+ $('ticket').innerHTML='<h1>HS4S</h1><div class="ticket-sub">MIJN MEDICATIEOVERZICHT</div><div class="ticket-date">Datum: '+date+'</div>'+
+ chosen.map(m=>'<div class="ticket-item"><div class="ticket-name">'+esc(m.naam)+'</div><div class="ticket-detail">'+esc(detail(m))+'</div></div>').join('')+
+ '<div class="ticket-foot">EINDE MEDICATIEOVERZICHT</div>';
+}
+function printTicket(){
+ if(!medicines.some(m=>m.geselecteerd)){alert('Vink eerst de medicijnen aan die je wilt afdrukken.');return;}
+ buildTicket();window.print();
+}
+function payload(){return {medicines:medicines,customCatalog:customCatalog};}
+function saveNow(){
+ if(!ready){setStatus('Nog aan het verbinden…');return;}
+ clearTimeout(saveTimer);
+ $('saveBtn').disabled=true;setStatus('Bewaren…');
+ google.script.run.withSuccessHandler(()=>{
+  dirty=false;$('saveBtn').disabled=false;setStatus('Bewaard in Google Sheets');
+ }).withFailureHandler(err=>{
+  $('saveBtn').disabled=false;setStatus('Bewaren mislukt: '+(err&&err.message?err.message:'onbekende fout'),true);
+ }).saveAppData(payload());
+}
+function loadData(){
+ setStatus('Gegevens ophalen…');
+ google.script.run.withSuccessHandler(data=>{
+  medicines=Array.isArray(data.medicines)?data.medicines:[];
+  customCatalog=Array.isArray(data.customCatalog)?data.customCatalog:[];
+  ready=true;dirty=false;renderAll();setStatus('Verbonden – gegevens geladen');
+ }).withFailureHandler(err=>{
+  ready=false;setStatus('Fout: '+(err&&err.message?err.message:'geen verbinding'),true);
+  $('medicines').innerHTML='<div class="empty">De gegevens konden niet worden geladen. Controleer of setup() en de webapp-deployment voltooid zijn.</div>';
+ }).getAppData();
+}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+loadData();
+</script>
+</body>
+</html>
